@@ -34,5 +34,19 @@ versionRange = "[13.0.8,)"
 ordering = "AFTER"
 side = "BOTH"
 
+[[dependencies.cobblemon_weather]]
+modId = "cobblemon"
+type = "optional"
+versionRange = "[1.6.1,)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.cobblemon_weather]]
+modId = "particlerain"
+type = "optional"
+versionRange = "[3.0.0,)"
+ordering = "NONE"
+side = "CLIENT"
+
 [[mixins]]
 config = "cobblemon_weather.mixins.json"
