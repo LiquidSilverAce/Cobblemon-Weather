@@ -31,7 +31,7 @@ subprojects {
         // for more information about repositories.
         maven {
             name = "Cobblemon"
-            url = "https://maven.cobblemon.com/releases/"
+            url = "https://artefacts.cobblemon.com/"
         }
     }
 
