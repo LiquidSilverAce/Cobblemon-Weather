@@ -1,4 +1,4 @@
-package com.weather.fabric.cobblemon;
+package com.weather.cobblemon;
 
 import com.cobblemon.mod.common.api.events.CobblemonEvents;
 import com.cobblemon.mod.common.battles.PokemonBattle;
@@ -7,7 +7,6 @@ import com.cobblemon.mod.common.battles.actor.PlayerBattleActor;
 import com.cobblemon.mod.common.battles.pokemon.BattlePokemon;
 import com.cobblemon.mod.common.pokemon.Pokemon;
 import com.weather.ExampleMod;
-import com.weather.cobblemon.WeatherRegistry;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.World;
@@ -119,7 +118,7 @@ public final class CobblemonEventListener {
 
     /**
      * Attempts to determine the ServerWorld of a battle by inspecting its player actors.
-     * Returns null if no valid overworld actor is found.
+     * Returns null if no valid player actor with a loaded world is found.
      */
     private static ServerWorld getBattleWorld(PokemonBattle battle) {
         for (BattleActor actor : battle.getActors()) {

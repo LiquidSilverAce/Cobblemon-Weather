@@ -2,7 +2,7 @@ package com.weather.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.fabricmc.loader.api.FabricLoader;
+import dev.architectury.platform.Platform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +30,7 @@ public final class ServerConfig {
     public boolean isClearWeatherOnBattleEnd() { return clearWeatherOnBattleEnd; }
 
     public static ServerConfig load() {
-        Path configDir = FabricLoader.getInstance().getConfigDir();
+        Path configDir = Platform.getConfigFolder();
         Path configFile = configDir.resolve(CONFIG_FILE);
         if (Files.exists(configFile)) {
             try (Reader reader = Files.newBufferedReader(configFile)) {

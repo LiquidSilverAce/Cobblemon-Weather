@@ -30,9 +30,7 @@
     "minecraft": "~1.21.1",
     "java": ">=21",
     "architectury": ">=13.0.8",
-    "fabric-api": "*",
-    "fabric-command-api-v2": "*",
-    "fabric-lifecycle-events-v1": "*"
+    "fabric-api": "*"
   },
   "suggests": {
     "cobblemon": ">=1.6.1",
