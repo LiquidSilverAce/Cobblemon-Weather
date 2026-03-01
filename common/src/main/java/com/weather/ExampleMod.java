@@ -5,7 +5,7 @@ import com.weather.command.WeatherDebugCommand;
 import com.weather.config.ServerConfig;
 import com.weather.logic.BattleWeatherManager;
 import dev.architectury.event.events.common.CommandRegistrationEvent;
-import dev.architectury.event.events.common.LifecycleEvent;
+import dev.architectury.event.events.common.TickEvent;
 import dev.architectury.platform.Platform;
 import net.minecraft.server.world.ServerWorld;
 import org.slf4j.Logger;
@@ -34,10 +34,8 @@ public final class ExampleMod {
                 WeatherDebugCommand.register(dispatcher));
 
         // Expire stale battle weather records once per tick per world
-        LifecycleEvent.SERVER_TICK_END.register(server -> {
-            for (ServerWorld world : server.getWorlds()) {
-                weatherManager.tick(world, world.getTime(), config);
-            }
+        TickEvent.SERVER_LEVEL_POST.register(world -> {
+            weatherManager.tick(world, world.getTime(), config);
         });
 
         LOGGER.info("[CobblemonWeather] Initialized. Weather integration enabled: {}",

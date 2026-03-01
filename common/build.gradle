@@ -12,4 +12,5 @@ dependencies {
     modImplementation "dev.architectury:architectury:$rootProject.architectury_api_version"
 
     modCompileOnly "com.cobblemon:fabric:$rootProject.cobblemon_version"
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib:1.9.22"
 }
