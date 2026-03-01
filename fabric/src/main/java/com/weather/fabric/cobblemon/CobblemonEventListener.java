@@ -66,6 +66,8 @@ public final class CobblemonEventListener {
                 Pokemon pokemon = bp.getOriginalPokemon();
                 String abilityName = pokemon.getAbility().getName();
 
+                // WeatherRegistry.forAbility normalises to lowercase, so either the
+                // Cobblemon internal ID or a mixed-case display name will be matched.
                 Optional<WeatherRegistry.WeatherEntry> entry = WeatherRegistry.forAbility(abilityName);
                 entry.ifPresent(e -> {
                     long currentTick = world.getTime();
@@ -79,8 +81,16 @@ public final class CobblemonEventListener {
     }
 
     /**
-     * Called when a weather move is successfully used. Wire this to the Cobblemon move event.
-     * Move ID should be lowercase (e.g. "raindance", "sunnyday").
+     * Called when a weather move is successfully used in the given battle.
+     * Wire this to the Cobblemon move event once the API is confirmed stable:
+     * <pre>
+     *   CobblemonEvents.MOVE_USED.subscribe(event -> {
+     *       CobblemonEventListener.handleMoveUsed(event.getBattle(), event.getMoveId());
+     *       return Unit.INSTANCE;
+     *   });
+     * </pre>
+     * Move ID should be lowercase (e.g. "raindance", "sunnyday"). WeatherRegistry normalises
+     * case internally, so the raw value from the event can be passed in directly.
      */
     public static void handleMoveUsed(PokemonBattle battle, String moveId) {
         ServerWorld world = getBattleWorld(battle);

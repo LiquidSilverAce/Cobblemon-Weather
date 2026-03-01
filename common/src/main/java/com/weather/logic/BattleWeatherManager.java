@@ -92,7 +92,11 @@ public final class BattleWeatherManager {
         switch (type) {
             case CLEAR, SUN -> world.setWeather(WEATHER_DURATION_TICKS, 0, false, false);
             case RAIN -> world.setWeather(0, WEATHER_DURATION_TICKS, true, false);
-            case SAND, SNOW -> world.setWeather(0, WEATHER_DURATION_TICKS, true, false); // Stage 1: treat as rain; refine in Stage 2
+            // SAND and SNOW also set vanilla raining=true.  Particle Rain reads isRaining() and
+            // then selects the correct visual effect per biome: sandstorm particles in hot/dry
+            // biomes (Precipitation.NONE + high temp) and snowstorm particles in cold biomes
+            // (Precipitation.SNOW).  No additional server-side call is needed.
+            case SAND, SNOW -> world.setWeather(0, WEATHER_DURATION_TICKS, true, false);
         }
     }
 }

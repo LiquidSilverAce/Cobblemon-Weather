@@ -35,6 +35,7 @@
     "fabric-lifecycle-events-v1": "*"
   },
   "suggests": {
-    "cobblemon": ">=1.6.1"
+    "cobblemon": ">=1.6.1",
+    "particlerain": "*"
   }
 }

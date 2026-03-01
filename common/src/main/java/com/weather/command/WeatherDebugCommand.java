@@ -11,12 +11,7 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.world.World;
 
-import java.util.UUID;
-
 public final class WeatherDebugCommand {
-
-    /** Dummy battle ID reserved for future use when the debug command routes through BattleWeatherManager. */
-    private static final UUID DEBUG_BATTLE_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(
