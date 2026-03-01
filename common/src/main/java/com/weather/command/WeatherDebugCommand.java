@@ -1,9 +1,11 @@
 package com.weather.command;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.weather.logic.BattleWeatherManager;
 import com.weather.logic.BattleWeatherType;
+import com.weather.ExampleMod;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -33,7 +35,7 @@ public final class WeatherDebugCommand {
                             } catch (IllegalArgumentException e) {
                                 ctx.getSource().sendError(
                                     Text.literal("Unknown weather type: " + typeName +
-                                        ". Valid: clear, sun, rain, sand, snow"));
+                                        ". Valid: clear, sun, rain, sand, snow, thunderstorm"));
                                 return 0;
                             }
 
@@ -53,7 +55,34 @@ public final class WeatherDebugCommand {
                         })
                     )
                 )
+                .then(CommandManager.literal("thunderstorm")
+                    .requires(src -> src.hasPermissionLevel(2))
+                    .executes(ctx -> applyDebugThunderstorm(ctx.getSource(), false))
+                    .then(CommandManager.argument("fast", BoolArgumentType.bool())
+                        .executes(ctx -> applyDebugThunderstorm(
+                                ctx.getSource(),
+                                BoolArgumentType.getBool(ctx, "fast")))
+                    )
+                )
         );
+    }
+
+    private static int applyDebugThunderstorm(ServerCommandSource source, boolean fast) {
+        ServerWorld world = source.getWorld();
+        if (!world.getRegistryKey().equals(World.OVERWORLD)) {
+            source.sendError(Text.literal("Thunderstorm command only works in the Overworld."));
+            return 0;
+        }
+        // Force-apply regardless of rain state and cooldown (debug bypass).
+        int durationTicks = fast
+                ? ExampleMod.getConfig().getThundurusFastTrackTicks()
+                : ExampleMod.getConfig().getNormalStormDurationTicks();
+        world.setWeather(0, durationTicks, true, true);
+        source.sendFeedback(
+                () -> Text.literal("[CobblemonWeather] Applied THUNDERSTORM"
+                        + (fast ? " (fast/Thundurus)" : "") + " for " + durationTicks + " ticks."),
+                true);
+        return 1;
     }
 
     private WeatherDebugCommand() {}

@@ -5,5 +5,6 @@ public enum BattleWeatherType {
     SUN,
     RAIN,
     SAND,
-    SNOW
+    SNOW,
+    THUNDERSTORM
 }

@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import kotlin.Unit;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public final class CobblemonEventListener {
@@ -41,12 +42,7 @@ public final class CobblemonEventListener {
             return Unit.INSTANCE;
         });
 
-        // TODO: Wire move-used weather detection once the Cobblemon move event API is confirmed stable.
-        // Example (API subject to change):
-        // CobblemonEvents.MOVE_USED.subscribe(event -> {
-        //     handleMoveUsed(event.getBattle(), event.getMoveId());
-        //     return Unit.INSTANCE;
-        // });
+        // Move events are wired via MoveInstructionMixin (see com.weather.mixin).
 
         LOGGER.info("[CobblemonWeather] Registered Cobblemon battle event listeners.");
     }
@@ -80,16 +76,11 @@ public final class CobblemonEventListener {
     }
 
     /**
-     * Called when a weather move is successfully used in the given battle.
-     * Wire this to the Cobblemon move event once the API is confirmed stable:
-     * <pre>
-     *   CobblemonEvents.MOVE_USED.subscribe(event -> {
-     *       CobblemonEventListener.handleMoveUsed(event.getBattle(), event.getMoveId());
-     *       return Unit.INSTANCE;
-     *   });
-     * </pre>
-     * Move ID should be lowercase (e.g. "raindance", "sunnyday"). WeatherRegistry normalises
-     * case internally, so the raw value from the event can be passed in directly.
+     * Called when any move is used in the given battle.
+     * Wired via {@link com.weather.mixin.MoveInstructionMixin} which injects into
+     * Cobblemon's {@code MoveInstruction.invoke()} — the handler for the Showdown
+     * {@code |move|} protocol message.
+     * Move ID is already lowercase (from {@code Effect.id}).
      */
     public static void handleMoveUsed(PokemonBattle battle, String moveId) {
         ServerWorld world = getBattleWorld(battle);
@@ -104,6 +95,53 @@ public final class CobblemonEventListener {
                     world, battleId, e.type(), e.priority(), currentTick, ExampleMod.getConfig());
             LOGGER.debug("[CobblemonWeather] Move {} -> {} (battle={})", moveId, e.type(), battleId);
         });
+    }
+
+    private static final Set<String> THUNDER_MOVES =
+            Set.of("thunder", "thunderbolt");
+    private static final Set<String> THUNDURUS_SPECIES =
+            Set.of("thundurus", "thundurustherian");
+
+    /**
+     * Handles thunderstorm upgrade logic triggered by a move.
+     *
+     * <ul>
+     *   <li>{@code thunder} / {@code thunderbolt}: upgrades to THUNDERSTORM if the overworld
+     *       is already raining (subject to 30-second cooldown).</li>
+     *   <li>{@code wildboltstorm} used by Thundurus/Thundurus-Therian: always triggers
+     *       THUNDERSTORM (fast-track, bypasses cooldown and rain requirement).</li>
+     * </ul>
+     *
+     * Called from {@link com.weather.mixin.MoveInstructionMixin}.
+     *
+     * @param battle    the active battle
+     * @param moveId    lowercase Cobblemon move identifier (from {@code Effect.id})
+     * @param speciesId lowercase Showdown species identifier (from {@code Species.showdownId()})
+     */
+    public static void handleThunderstormMove(PokemonBattle battle, String moveId, String speciesId) {
+        ServerWorld world = getBattleWorld(battle);
+        if (world == null) return;
+        if (!world.getRegistryKey().equals(World.OVERWORLD)) return;
+
+        long currentTick = world.getTime();
+        boolean fastTrack = "wildboltstorm".equals(moveId) && THUNDURUS_SPECIES.contains(speciesId);
+        boolean isThunderMove = THUNDER_MOVES.contains(moveId);
+
+        if (!fastTrack && !isThunderMove) return;
+
+        // Note: wildboltstorm only fast-tracks when the user IS Thundurus/Thundurus-Therian.
+        // If another species somehow uses wildboltstorm it falls through to the normal thunder
+        // check (which requires rain), intentionally preventing unintended triggering.
+        if ("wildboltstorm".equals(moveId) && !fastTrack) {
+            LOGGER.debug("[CobblemonWeather] wildboltstorm used by non-Thundurus species '{}'; no fast-track.",
+                    speciesId);
+            return;
+        }
+
+        LOGGER.debug("[CobblemonWeather] {} used {} → THUNDERSTORM{} (battle={})",
+                speciesId, moveId, fastTrack ? " (fast)" : "", battle.getBattleId());
+
+        ExampleMod.getWeatherManager().applyThunderstorm(world, fastTrack, currentTick, ExampleMod.getConfig());
     }
 
     private static void handleBattleEnd(PokemonBattle battle) {
