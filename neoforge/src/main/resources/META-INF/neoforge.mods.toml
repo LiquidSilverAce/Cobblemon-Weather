@@ -7,11 +7,11 @@ license = "Insert License Here"
 modId = "cobblemon_weather"
 version = "${version}"
 displayName = "Cobblemon Weather"
-displayTest = "IGNORE_ALL_VERSION"
 authors = "Me!"
-description = '''
+description = "'''
 This is an example description! Tell everyone what your mod is about!
 '''
+"
 #logoFile = ""
 
 [[dependencies.cobblemon_weather]]
