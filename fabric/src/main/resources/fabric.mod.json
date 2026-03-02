@@ -13,10 +13,13 @@
   },
   "license": "CC0-1.0",
   "icon": "assets/cobblemon_weather/icon.png",
-  "environment": "server",
+  "environment": "*",
   "entrypoints": {
     "main": [
       "com.weather.fabric.ExampleModFabric"
+    ],
+    "client": [
+      "com.weather.fabric.client.ExampleModFabricClient"
     ]
   },
   "mixins": [
