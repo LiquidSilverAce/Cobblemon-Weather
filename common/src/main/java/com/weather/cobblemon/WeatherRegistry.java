@@ -34,8 +34,6 @@ public final class WeatherRegistry {
         ABILITY_REGISTRY.put("snowwarning",   new WeatherEntry(BattleWeatherType.SNOW, 1));
         ABILITY_REGISTRY.put("primordialsea", new WeatherEntry(BattleWeatherType.RAIN, 2));
         ABILITY_REGISTRY.put("desolateland",  new WeatherEntry(BattleWeatherType.SUN,  2));
-        ABILITY_REGISTRY.put("cloudnine",     new WeatherEntry(BattleWeatherType.SUN,  1));
-        ABILITY_REGISTRY.put("airlock",       new WeatherEntry(BattleWeatherType.SUN,  1));
     }
 
     public static Optional<WeatherEntry> forMove(String moveId) {
