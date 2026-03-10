@@ -26,7 +26,6 @@ public final class BattleWeatherManager {
                                        UUID battleId,
                                        BattleWeatherType type,
                                        int priority,
-                                       long currentTick,
                                        ServerConfig config) {
         if (!config.isEnableWeatherIntegration()) return;
 
@@ -34,7 +33,7 @@ public final class BattleWeatherManager {
         ActiveBattleWeather existing = activeWeather.get(dimKey);
 
         boolean shouldApply;
-        if (existing == null || existing.isExpired(currentTick)) {
+        if (existing == null) {
             shouldApply = true;
         } else if (existing.getSourceBattleId().equals(battleId)) {
             shouldApply = true;
@@ -53,16 +52,15 @@ public final class BattleWeatherManager {
         }
 
         if (shouldApply) {
-            long expiresAt = currentTick + config.getMinDurationTicks();
-            ActiveBattleWeather record = new ActiveBattleWeather(type, battleId, priority, expiresAt);
+            ActiveBattleWeather record = new ActiveBattleWeather(type, battleId, priority);
             activeWeather.put(dimKey, record);
             applyMinecraftWeather(world, type);
-            LOGGER.debug("[CobblemonWeather] Applied {} in {} (battle={}, priority={}, expiresAt={})",
-                    type, dimKey.getValue(), battleId, priority, expiresAt);
+            LOGGER.debug("[CobblemonWeather] Applied {} in {} (battle={}, priority={})",
+                    type, dimKey.getValue(), battleId, priority);
         }
     }
 
-    public void onBattleEnd(ServerWorld world, UUID battleId, long currentTick, ServerConfig config) {
+    public void onBattleEnd(ServerWorld world, UUID battleId, ServerConfig config) {
         if (!config.isEnableWeatherIntegration()) return;
 
         RegistryKey<World> dimKey = world.getRegistryKey();
@@ -74,18 +72,7 @@ public final class BattleWeatherManager {
                 LOGGER.debug("[CobblemonWeather] Cleared weather in {} after battle {} ended",
                         dimKey.getValue(), battleId);
             }
-            // Otherwise let expiresAtTick decay naturally
-        }
-    }
-
-    public void tick(ServerWorld world, long currentTick, ServerConfig config) {
-        if (!config.isEnableWeatherIntegration()) return;
-
-        RegistryKey<World> dimKey = world.getRegistryKey();
-        ActiveBattleWeather existing = activeWeather.get(dimKey);
-        if (existing != null && existing.isExpired(currentTick)) {
-            activeWeather.remove(dimKey);
-            LOGGER.debug("[CobblemonWeather] Battle weather expired in {}", dimKey.getValue());
+            // Otherwise let Minecraft's own rainTime/thunderTime counters run down naturally
         }
     }
 
@@ -118,29 +105,28 @@ public final class BattleWeatherManager {
             }
         }
 
-        int durationTicks = fastTrack ? config.getThundurusFastTrackTicks() : config.getNormalStormDurationTicks();
+        int rainDuration = world.getRandom().nextBetween(12000, 24000);
         lastThunderstormTick.put(dimKey, currentTick);
-        world.setWeather(0, durationTicks, true, true);
-        LOGGER.debug("[CobblemonWeather] Applied THUNDERSTORM in {} (fastTrack={}, duration={})",
-                dimKey.getValue(), fastTrack, durationTicks);
+        world.setWeather(0, rainDuration, true, true);
+        LOGGER.debug("[CobblemonWeather] Applied THUNDERSTORM in {} (fastTrack={}, rainDuration={})",
+                dimKey.getValue(), fastTrack, rainDuration);
     }
-
-    private static final int WEATHER_DURATION_TICKS = 20 * 60; // 60 seconds
 
     /**
      * Apply weather directly by type (used by debug command and battle logic).
      */
     public static void applyMinecraftWeather(ServerWorld world, BattleWeatherType type) {
+        int rainDuration = world.getRandom().nextBetween(12000, 24000);
         switch (type) {
-            case CLEAR, SUN -> world.setWeather(WEATHER_DURATION_TICKS, 0, false, false);
-            case RAIN -> world.setWeather(0, WEATHER_DURATION_TICKS, true, false);
+            case CLEAR, SUN -> world.setWeather(rainDuration, 0, false, false);
+            case RAIN -> world.setWeather(0, rainDuration, true, false);
             // THUNDERSTORM: raining + thundering
-            case THUNDERSTORM -> world.setWeather(0, WEATHER_DURATION_TICKS, true, true);
+            case THUNDERSTORM -> world.setWeather(0, rainDuration, true, true);
             // SAND and SNOW also set vanilla raining=true.  Particle Rain reads isRaining() and
             // then selects the correct visual effect per biome: sandstorm particles in hot/dry
             // biomes (Precipitation.NONE + high temp) and snowstorm particles in cold biomes
             // (Precipitation.SNOW).  No additional server-side call is needed.
-            case SAND, SNOW -> world.setWeather(0, WEATHER_DURATION_TICKS, true, false);
+            case SAND, SNOW -> world.setWeather(0, rainDuration, true, false);
         }
     }
 }

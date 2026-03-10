@@ -60,9 +60,8 @@ public final class CobblemonEventListener {
 
                 Optional<WeatherRegistry.WeatherEntry> entry = WeatherRegistry.forAbility(abilityName);
                 entry.ifPresent(e -> {
-                    long currentTick = world.getTime();
                     ExampleMod.getWeatherManager().applyWeatherFromBattle(
-                            world, battleId, e.type(), e.priority(), currentTick, ExampleMod.getConfig());
+                            world, battleId, e.type(), e.priority(), ExampleMod.getConfig());
                     LOGGER.debug("[CobblemonWeather] Ability {} -> {} (battle={})",
                             abilityName, e.type(), battleId);
                 });
@@ -78,9 +77,8 @@ public final class CobblemonEventListener {
         UUID battleId = battle.getBattleId();
         Optional<WeatherRegistry.WeatherEntry> entry = WeatherRegistry.forMove(moveId);
         entry.ifPresent(e -> {
-            long currentTick = world.getTime();
             ExampleMod.getWeatherManager().applyWeatherFromBattle(
-                    world, battleId, e.type(), e.priority(), currentTick, ExampleMod.getConfig());
+                    world, battleId, e.type(), e.priority(), ExampleMod.getConfig());
             LOGGER.debug("[CobblemonWeather] Move {} -> {} (battle={})", moveId, e.type(), battleId);
         });
     }
@@ -119,8 +117,7 @@ public final class CobblemonEventListener {
         if (!world.getRegistryKey().equals(World.OVERWORLD)) return;
 
         UUID battleId = battle.getBattleId();
-        long currentTick = world.getTime();
-        ExampleMod.getWeatherManager().onBattleEnd(world, battleId, currentTick, ExampleMod.getConfig());
+        ExampleMod.getWeatherManager().onBattleEnd(world, battleId, ExampleMod.getConfig());
     }
 
     private static ServerWorld getBattleWorld(PokemonBattle battle) {
