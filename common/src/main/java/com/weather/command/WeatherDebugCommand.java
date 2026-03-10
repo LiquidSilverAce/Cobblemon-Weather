@@ -5,7 +5,6 @@ import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.weather.logic.BattleWeatherManager;
 import com.weather.logic.BattleWeatherType;
-import com.weather.ExampleMod;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
@@ -14,6 +13,9 @@ import net.minecraft.text.Text;
 import net.minecraft.world.World;
 
 public final class WeatherDebugCommand {
+
+    private static final int NORMAL_STORM_DURATION_TICKS = 1800;
+    private static final int THUNDURUS_FAST_TRACK_TICKS  = 900;
 
     public static void register(CommandDispatcher<ServerCommandSource> dispatcher) {
         dispatcher.register(
@@ -74,9 +76,7 @@ public final class WeatherDebugCommand {
             return 0;
         }
         // Force-apply regardless of rain state and cooldown (debug bypass).
-        int durationTicks = fast
-                ? ExampleMod.getConfig().getThundurusFastTrackTicks()
-                : ExampleMod.getConfig().getNormalStormDurationTicks();
+        int durationTicks = fast ? THUNDURUS_FAST_TRACK_TICKS : NORMAL_STORM_DURATION_TICKS;
         world.setWeather(0, durationTicks, true, true);
         source.sendFeedback(
                 () -> Text.literal("[CobblemonWeather] Applied THUNDERSTORM"
