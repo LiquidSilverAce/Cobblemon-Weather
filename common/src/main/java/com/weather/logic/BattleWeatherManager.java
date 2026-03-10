@@ -125,7 +125,8 @@ public final class BattleWeatherManager {
                 dimKey.getValue(), fastTrack, durationTicks);
     }
 
-    private static final int WEATHER_DURATION_TICKS = 20 * 60; // 60 seconds
+    /** One full Minecraft in-game day = 24 000 ticks. */
+    private static final int WEATHER_DURATION_TICKS = 24_000;
 
     /**
      * Apply weather directly by type (used by debug command and battle logic).
@@ -133,7 +134,7 @@ public final class BattleWeatherManager {
     public static void applyMinecraftWeather(ServerWorld world, BattleWeatherType type) {
         switch (type) {
             case CLEAR, SUN -> world.setWeather(WEATHER_DURATION_TICKS, 0, false, false);
-            case RAIN -> world.setWeather(0, WEATHER_DURATION_TICKS, true, false);
+            case RAIN       -> world.setWeather(0, WEATHER_DURATION_TICKS, true, false);
             // THUNDERSTORM: raining + thundering
             case THUNDERSTORM -> world.setWeather(0, WEATHER_DURATION_TICKS, true, true);
             // SAND and SNOW also set vanilla raining=true.  Particle Rain reads isRaining() and
