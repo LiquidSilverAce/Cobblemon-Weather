@@ -74,7 +74,6 @@ public final class WeatherDebugCommand {
             return 0;
         }
         // Force-apply regardless of rain state and cooldown (debug bypass).
-        // 1 Minecraft day = 24000 ticks
         int durationTicks = fast
                 ? ExampleMod.getConfig().getThundurusFastTrackTicks()
                 : ExampleMod.getConfig().getNormalStormDurationTicks();
@@ -87,3 +86,4 @@ public final class WeatherDebugCommand {
     }
 
     private WeatherDebugCommand() {}
+}
