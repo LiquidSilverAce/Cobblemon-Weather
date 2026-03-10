@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -16,11 +17,19 @@ public final class BattleWeatherManager {
 
     private final Map<RegistryKey<World>, ActiveBattleWeather> activeWeather = new ConcurrentHashMap<>();
 
+    /** Battles that are currently ongoing (started but not yet ended). */
+    private final Set<UUID> activeBattleIds = ConcurrentHashMap.newKeySet();
+
     /** Tick at which the last thunderstorm was applied per dimension, for cooldown enforcement. */
     private final Map<RegistryKey<World>, Long> lastThunderstormTick = new ConcurrentHashMap<>();
 
     /** Minimum ticks between thunderstorm triggers (30 seconds), bypassed by Thundurus fast-track. */
     private static final int THUNDERSTORM_COOLDOWN_TICKS = 600;
+
+    public void onBattleStart(UUID battleId) {
+        activeBattleIds.add(battleId);
+        LOGGER.debug("[CobblemonWeather] Battle started: {}", battleId);
+    }
 
     public void applyWeatherFromBattle(ServerWorld world,
                                        UUID battleId,
@@ -37,9 +46,13 @@ public final class BattleWeatherManager {
         if (existing == null || existing.isExpired(currentTick)) {
             shouldApply = true;
         } else if (existing.getSourceBattleId().equals(battleId)) {
+            // Same battle: weather changes within a battle are always allowed
+            shouldApply = true;
+        } else if (!activeBattleIds.contains(existing.getSourceBattleId())) {
+            // The battle that originally set the weather has since ended: allow the new battle in
             shouldApply = true;
         } else {
-            // Different battle still active
+            // Different battle still active: first-setter gets priority
             if (!config.isAllowCrossBattleOverride()) {
                 shouldApply = false;
             } else {
@@ -64,6 +77,8 @@ public final class BattleWeatherManager {
 
     public void onBattleEnd(ServerWorld world, UUID battleId, long currentTick, ServerConfig config) {
         if (!config.isEnableWeatherIntegration()) return;
+
+        activeBattleIds.remove(battleId);
 
         RegistryKey<World> dimKey = world.getRegistryKey();
         ActiveBattleWeather existing = activeWeather.get(dimKey);

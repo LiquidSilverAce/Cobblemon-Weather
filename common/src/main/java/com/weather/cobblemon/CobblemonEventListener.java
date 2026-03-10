@@ -50,6 +50,7 @@ public final class CobblemonEventListener {
         if (!world.getRegistryKey().equals(World.OVERWORLD)) return;
 
         UUID battleId = battle.getBattleId();
+        ExampleMod.getWeatherManager().onBattleStart(battleId);
 
         for (BattleActor actor : battle.getActors()) {
             for (var activePokemon : actor.getActivePokemon()) {
