@@ -53,7 +53,7 @@ public final class BattleWeatherManager {
         }
 
         if (shouldApply) {
-            long expiresAt = currentTick + config.getMinDurationTicks();
+            long expiresAt = currentTick + WEATHER_DURATION_TICKS;
             ActiveBattleWeather record = new ActiveBattleWeather(type, battleId, priority, expiresAt);
             activeWeather.put(dimKey, record);
             applyMinecraftWeather(world, type);
