@@ -14,9 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class BattleWeatherManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("cobblemon_weather");
 
-    /** One Minecraft in-game day = 24000 ticks */
-    private static final int WEATHER_DURATION_TICKS = 24000;
-
     private final Map<RegistryKey<World>, ActiveBattleWeather> activeWeather = new ConcurrentHashMap<>();
 
     /** Tick at which the last thunderstorm was applied per dimension, for cooldown enforcement. */
@@ -128,9 +125,11 @@ public final class BattleWeatherManager {
                 dimKey.getValue(), fastTrack, durationTicks);
     }
 
+    /** One full Minecraft day = 24000 ticks (20 ticks/sec x 1200 sec). */
+    private static final int WEATHER_DURATION_TICKS = 24000;
+
     /**
      * Apply weather directly by type (used by debug command and battle logic).
-     * Duration is 1 in-game day (24000 ticks).
      */
     public static void applyMinecraftWeather(ServerWorld world, BattleWeatherType type) {
         switch (type) {
