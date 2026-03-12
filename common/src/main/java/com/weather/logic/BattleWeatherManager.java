@@ -66,10 +66,11 @@ public final class BattleWeatherManager {
         }
 
         if (shouldApply) {
-            long expiresAt = currentTick + WEATHER_DURATION_TICKS;
+            int durationTicks = config.getBattleWeatherDurationTicks();
+            long expiresAt = currentTick + durationTicks;
             ActiveBattleWeather record = new ActiveBattleWeather(type, battleId, priority, expiresAt);
             activeWeather.put(dimKey, record);
-            applyMinecraftWeather(world, type);
+            applyMinecraftWeather(world, type, durationTicks);
             LOGGER.debug("[CobblemonWeather] Applied {} in {} (battle={}, priority={}, expiresAt={})",
                     type, dimKey.getValue(), battleId, priority, expiresAt);
         }
@@ -85,7 +86,7 @@ public final class BattleWeatherManager {
         if (existing != null && existing.getSourceBattleId().equals(battleId)) {
             if (config.isClearWeatherOnBattleEnd()) {
                 activeWeather.remove(dimKey);
-                applyMinecraftWeather(world, BattleWeatherType.CLEAR);
+                applyMinecraftWeather(world, BattleWeatherType.CLEAR, config.getBattleWeatherDurationTicks());
                 LOGGER.debug("[CobblemonWeather] Cleared weather in {} after battle {} ended",
                         dimKey.getValue(), battleId);
             }
@@ -141,22 +142,32 @@ public final class BattleWeatherManager {
     }
 
     /** One full Minecraft day = 24000 ticks (20 ticks/sec x 1200 sec). */
-    private static final int WEATHER_DURATION_TICKS = 24000;
+    private static final int DEFAULT_WEATHER_DURATION_TICKS = 24000;
 
     /**
      * Apply weather directly by type (used by debug command and battle logic).
+     *
+     * @param durationTicks how long the vanilla weather effect should last
      */
-    public static void applyMinecraftWeather(ServerWorld world, BattleWeatherType type) {
+    public static void applyMinecraftWeather(ServerWorld world, BattleWeatherType type, int durationTicks) {
         switch (type) {
-            case CLEAR, SUN -> world.setWeather(WEATHER_DURATION_TICKS, 0, false, false);
-            case RAIN -> world.setWeather(0, WEATHER_DURATION_TICKS, true, false);
+            case CLEAR, SUN -> world.setWeather(durationTicks, 0, false, false);
+            case RAIN -> world.setWeather(0, durationTicks, true, false);
             // THUNDERSTORM: raining + thundering
-            case THUNDERSTORM -> world.setWeather(0, WEATHER_DURATION_TICKS, true, true);
+            case THUNDERSTORM -> world.setWeather(0, durationTicks, true, true);
             // SAND and SNOW also set vanilla raining=true.  Particle Rain reads isRaining() and
             // then selects the correct visual effect per biome: sandstorm particles in hot/dry
             // biomes (Precipitation.NONE + high temp) and snowstorm particles in cold biomes
             // (Precipitation.SNOW).  No additional server-side call is needed.
-            case SAND, SNOW -> world.setWeather(0, WEATHER_DURATION_TICKS, true, false);
+            case SAND, SNOW -> world.setWeather(0, durationTicks, true, false);
         }
+    }
+
+    /**
+     * Apply weather directly by type using the default duration.
+     * Convenience overload used by the debug command.
+     */
+    public static void applyMinecraftWeather(ServerWorld world, BattleWeatherType type) {
+        applyMinecraftWeather(world, type, DEFAULT_WEATHER_DURATION_TICKS);
     }
 }
