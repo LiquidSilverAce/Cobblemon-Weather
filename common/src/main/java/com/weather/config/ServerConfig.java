@@ -23,8 +23,6 @@ public final class ServerConfig {
     private boolean allowCrossBattleOverride = false;
     private boolean clearWeatherOnBattleEnd = false;
     private boolean enableThunderstormIntegration = true;
-    private int normalStormDurationTicks = 1800;
-    private int thundurusFastTrackTicks = 900;
 
     public boolean isEnableWeatherIntegration() { return enableWeatherIntegration; }
     public int getBattleWeatherDurationTicks() { return battleWeatherDurationTicks; }
@@ -32,8 +30,6 @@ public final class ServerConfig {
     public boolean isAllowCrossBattleOverride() { return allowCrossBattleOverride; }
     public boolean isClearWeatherOnBattleEnd() { return clearWeatherOnBattleEnd; }
     public boolean isEnableThunderstormIntegration() { return enableThunderstormIntegration; }
-    public int getNormalStormDurationTicks() { return normalStormDurationTicks; }
-    public int getThundurusFastTrackTicks() { return thundurusFastTrackTicks; }
 
     public static ServerConfig load() {
         Path configDir = Platform.getConfigFolder();

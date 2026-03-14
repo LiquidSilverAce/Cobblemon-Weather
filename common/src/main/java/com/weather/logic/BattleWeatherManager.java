@@ -134,10 +134,10 @@ public final class BattleWeatherManager {
             }
         }
 
-        int durationTicks = fastTrack ? config.getThundurusFastTrackTicks() : config.getNormalStormDurationTicks();
+        int durationTicks = config.getBattleWeatherDurationTicks();
         lastThunderstormTick.put(dimKey, currentTick);
         world.setWeather(0, durationTicks, true, true);
-        LOGGER.debug("[CobblemonWeather] Applied THUNDERSTORM in {} (fastTrack={}, duration={})",
+        LOGGER.debug("[CobblemonWeather] Applied THUNDERSTORM in {} (fastTrack={}, duration={}t)",
                 dimKey.getValue(), fastTrack, durationTicks);
     }
 
