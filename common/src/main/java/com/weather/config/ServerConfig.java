@@ -18,22 +18,18 @@ public final class ServerConfig {
     private static final String CONFIG_FILE = "cobblemon_weather.json";
 
     private boolean enableWeatherIntegration = true;
-    private int minDurationTicks = 600;
+    private int battleWeatherDurationTicks = 24000;
     private boolean allowPrimalOverride = true;
     private boolean allowCrossBattleOverride = false;
     private boolean clearWeatherOnBattleEnd = false;
     private boolean enableThunderstormIntegration = true;
-    private int normalStormDurationTicks = 1800;
-    private int thundurusFastTrackTicks = 900;
 
     public boolean isEnableWeatherIntegration() { return enableWeatherIntegration; }
-    public int getMinDurationTicks() { return minDurationTicks; }
+    public int getBattleWeatherDurationTicks() { return battleWeatherDurationTicks; }
     public boolean isAllowPrimalOverride() { return allowPrimalOverride; }
     public boolean isAllowCrossBattleOverride() { return allowCrossBattleOverride; }
     public boolean isClearWeatherOnBattleEnd() { return clearWeatherOnBattleEnd; }
     public boolean isEnableThunderstormIntegration() { return enableThunderstormIntegration; }
-    public int getNormalStormDurationTicks() { return normalStormDurationTicks; }
-    public int getThundurusFastTrackTicks() { return thundurusFastTrackTicks; }
 
     public static ServerConfig load() {
         Path configDir = Platform.getConfigFolder();
