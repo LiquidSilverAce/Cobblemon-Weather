@@ -46,8 +46,11 @@ public final class BattleWeatherManager {
         if (existing == null || existing.isExpired(currentTick)) {
             shouldApply = true;
         } else if (existing.getSourceBattleId().equals(battleId)) {
-            // Same battle: weather changes within a battle are always allowed
-            shouldApply = true;
+            // Within the same battle, priority-2 weather (Primordial Sea / Desolate Land /
+            // Delta Stream) can only be replaced by another priority-2 effect.
+            // All other priority tiers (0 = moves, 1 = regular abilities) can override each other
+            // freely, matching base-game Cobblemon logic.
+            shouldApply = (existing.getPriority() < 2) || (priority >= 2);
         } else if (!activeBattleIds.contains(existing.getSourceBattleId())) {
             // The battle that originally set the weather has since ended: allow the new battle in
             shouldApply = true;

@@ -72,44 +72,36 @@ public final class CobblemonEventListener {
     }
 
     /**
-     * Called by {@link com.weather.mixin.SwitchInstructionMixin} whenever a Pokemon switches in
-     * (including the initial send-out at battle start as processed by the battle interpreter).
+     * Called by {@link com.weather.mixin.AbilityInstructionMixin} whenever Cobblemon processes
+     * a {@code |-ability|POKEMON|ABILITY} protocol message.  This fires in two important cases:
+     * <ol>
+     *   <li>A Pokémon <em>switches in</em> and its weather ability (Drizzle, Drought, Primordial
+     *       Sea, Desolate Land, Delta Stream, Orichalcum Pulse, etc.) activates.</li>
+     *   <li>A Pokémon's ability <em>changes mid-battle</em> — most notably Rayquaza's Mega
+     *       Evolution granting Delta Stream.</li>
+     * </ol>
      *
-     * <p>We iterate all currently-active Pokemon for every actor and re-evaluate their weather
-     * abilities.  This naturally handles:
-     * <ul>
-     *   <li>Drizzle / Drought / Sand Stream / Snow Warning on first send-out</li>
-     *   <li>Same abilities when a Pokemon is switched in mid-battle</li>
-     *   <li>Primordial Sea / Desolate Land / Orichalcum Pulse on send-out</li>
-     *   <li>Delta Stream — clears all overworld weather on send-out</li>
-     * </ul>
+     * <p>Unlike {@code SwitchInstruction.invoke()}, {@code AbilityInstruction.invoke()} fires
+     * <em>after</em> the switch dispatch has completed and the new Pokémon is fully active,
+     * so the ability ID is always the correct one for the Pokémon now on the field.
      */
-    public static void handleSwitchIn(PokemonBattle battle) {
+    public static void handleAbilityTriggered(PokemonBattle battle, String abilityId) {
         ServerWorld world = getBattleWorld(battle);
         if (world == null) return;
         if (!world.getRegistryKey().equals(World.OVERWORLD)) return;
 
+        Optional<WeatherRegistry.WeatherEntry> entry = WeatherRegistry.forAbility(abilityId);
+        if (entry.isEmpty()) return;
+
+        WeatherRegistry.WeatherEntry e = entry.get();
         UUID battleId = battle.getBattleId();
         // Ensure the battle is tracked (idempotent — safe to call multiple times).
         ExampleMod.getWeatherManager().onBattleStart(battleId);
-
         long currentTick = world.getTime();
-        for (BattleActor actor : battle.getActors()) {
-            for (var activePokemon : actor.getActivePokemon()) {
-                BattlePokemon bp = activePokemon.getBattlePokemon();
-                if (bp == null) continue;
-                Pokemon pokemon = bp.getOriginalPokemon();
-                String abilityName = pokemon.getAbility().getName();
-
-                Optional<WeatherRegistry.WeatherEntry> entry = WeatherRegistry.forAbility(abilityName);
-                entry.ifPresent(e -> {
-                    ExampleMod.getWeatherManager().applyWeatherFromBattle(
-                            world, battleId, e.type(), e.priority(), currentTick, ExampleMod.getConfig());
-                    LOGGER.debug("[CobblemonWeather] Switch-in ability {} -> {} (battle={})",
-                            abilityName, e.type(), battleId);
-                });
-            }
-        }
+        ExampleMod.getWeatherManager().applyWeatherFromBattle(
+                world, battleId, e.type(), e.priority(), currentTick, ExampleMod.getConfig());
+        LOGGER.debug("[CobblemonWeather] Ability {} -> {} triggered (battle={})",
+                abilityId, e.type(), battleId);
     }
 
     public static void handleMoveUsed(PokemonBattle battle, String moveId) {
