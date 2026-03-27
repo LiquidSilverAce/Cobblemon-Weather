@@ -151,6 +151,10 @@ public final class BattleWeatherManager {
      */
     public static void applyMinecraftWeather(ServerWorld world, BattleWeatherType type, int durationTicks) {
         switch (type) {
+            // Both CLEAR and SUN set clear weather (no rain, no thunder).
+            // SUN additionally signals "harsh sunlight" to battle-side logic, but the
+            // vanilla weather call is identical.  Delta Stream (CLEAR) and Sunny Day (SUN)
+            // therefore both stop any ongoing rain, thunderstorm, or snowstorm.
             case CLEAR, SUN -> world.setWeather(durationTicks, 0, false, false);
             case RAIN -> world.setWeather(0, durationTicks, true, false);
             // THUNDERSTORM: raining + thundering

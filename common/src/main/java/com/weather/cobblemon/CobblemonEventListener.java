@@ -71,6 +71,47 @@ public final class CobblemonEventListener {
         }
     }
 
+    /**
+     * Called by {@link com.weather.mixin.SwitchInstructionMixin} whenever a Pokemon switches in
+     * (including the initial send-out at battle start as processed by the battle interpreter).
+     *
+     * <p>We iterate all currently-active Pokemon for every actor and re-evaluate their weather
+     * abilities.  This naturally handles:
+     * <ul>
+     *   <li>Drizzle / Drought / Sand Stream / Snow Warning on first send-out</li>
+     *   <li>Same abilities when a Pokemon is switched in mid-battle</li>
+     *   <li>Primordial Sea / Desolate Land / Orichalcum Pulse on send-out</li>
+     *   <li>Delta Stream — clears all overworld weather on send-out</li>
+     * </ul>
+     */
+    public static void handleSwitchIn(PokemonBattle battle) {
+        ServerWorld world = getBattleWorld(battle);
+        if (world == null) return;
+        if (!world.getRegistryKey().equals(World.OVERWORLD)) return;
+
+        UUID battleId = battle.getBattleId();
+        // Ensure the battle is tracked (idempotent — safe to call multiple times).
+        ExampleMod.getWeatherManager().onBattleStart(battleId);
+
+        long currentTick = world.getTime();
+        for (BattleActor actor : battle.getActors()) {
+            for (var activePokemon : actor.getActivePokemon()) {
+                BattlePokemon bp = activePokemon.getBattlePokemon();
+                if (bp == null) continue;
+                Pokemon pokemon = bp.getOriginalPokemon();
+                String abilityName = pokemon.getAbility().getName();
+
+                Optional<WeatherRegistry.WeatherEntry> entry = WeatherRegistry.forAbility(abilityName);
+                entry.ifPresent(e -> {
+                    ExampleMod.getWeatherManager().applyWeatherFromBattle(
+                            world, battleId, e.type(), e.priority(), currentTick, ExampleMod.getConfig());
+                    LOGGER.debug("[CobblemonWeather] Switch-in ability {} -> {} (battle={})",
+                            abilityName, e.type(), battleId);
+                });
+            }
+        }
+    }
+
     public static void handleMoveUsed(PokemonBattle battle, String moveId) {
         ServerWorld world = getBattleWorld(battle);
         if (world == null) return;

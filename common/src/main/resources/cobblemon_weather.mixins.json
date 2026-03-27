@@ -6,7 +6,8 @@
   "client": [
   ],
   "mixins": [
-    "MoveInstructionMixin"
+    "MoveInstructionMixin",
+    "SwitchInstructionMixin"
   ],
   "injectors": {
     "defaultRequire": 1
