@@ -77,10 +77,10 @@ public abstract class WeatherInstructionMixin {
             if ("none".equals(weatherId)) return;
 
             // Inspect the [from] optional argument to detect ability-caused weather.
-            // BattleMessage.effect(argumentName) defaults the argument name to "from",
-            // so this call retrieves the [from] optional argument from the Showdown message.
+            // BattleMessage.effect(String) requires an explicit argument from Java because
+            // Kotlin default parameters are not exposed as no-arg overloads in the JVM API.
             // If present and of ABILITY type, the ability ID carries the correct priority.
-            Effect from = message.effect(); // retrieves the "[from]" optional argument
+            Effect from = message.effect("from"); // retrieves the "[from]" optional argument
             String abilityId = (from != null && from.getType() == Effect.Type.ABILITY)
                     ? from.getId()
                     : null;
