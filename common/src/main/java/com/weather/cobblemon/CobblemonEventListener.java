@@ -72,25 +72,40 @@ public final class CobblemonEventListener {
     }
 
     /**
-     * Called by {@link com.weather.mixin.AbilityInstructionMixin} whenever Cobblemon processes
-     * a {@code |-ability|POKEMON|ABILITY} protocol message.  This fires in two important cases:
-     * <ol>
-     *   <li>A Pokémon <em>switches in</em> and its weather ability (Drizzle, Drought, Primordial
-     *       Sea, Desolate Land, Delta Stream, Orichalcum Pulse, etc.) activates.</li>
-     *   <li>A Pokémon's ability <em>changes mid-battle</em> — most notably Rayquaza's Mega
-     *       Evolution granting Delta Stream.</li>
-     * </ol>
+     * Called by {@link com.weather.mixin.WeatherInstructionMixin} for every new weather change
+     * that Cobblemon processes from the Showdown {@code |-weather|} protocol message.
      *
-     * <p>Unlike {@code SwitchInstruction.invoke()}, {@code AbilityInstruction.invoke()} fires
-     * <em>after</em> the switch dispatch has completed and the new Pokémon is fully active,
-     * so the ability ID is always the correct one for the Pokémon now on the field.
+     * <p>When the weather was caused by an ability (switch-in with Drizzle, Primordial Sea,
+     * Delta Stream, Orichalcum Pulse, or a mid-battle ability change such as Rayquaza Mega
+     * Evolution), {@code abilityId} is the lowercased Showdown ability ID extracted from the
+     * {@code [from] ability:} optional argument.  The ability registry provides the correct
+     * priority for that ability.
+     *
+     * <p>When the weather was caused by a move (Rain Dance, Sunny Day, Sandstorm, Snowscape,
+     * or Thundurus Wildbolt Storm), {@code abilityId} is {@code null} and {@code weatherId}
+     * is used instead.  Wildbolt Storm maps to {@code THUNDERSTORM} at priority 2 via the
+     * weather registry.
+     *
+     * @param battle    the ongoing Pokémon battle
+     * @param abilityId lowercased ability ID when the weather was ability-triggered, else null
+     * @param weatherId lowercased Showdown weather effect ID (e.g. {@code "rainweather"},
+     *                  {@code "wildboltstorm"}, {@code "deltastream"})
      */
-    public static void handleAbilityTriggered(PokemonBattle battle, String abilityId) {
+    public static void handleWeatherInstruction(PokemonBattle battle, String abilityId, String weatherId) {
         ServerWorld world = getBattleWorld(battle);
         if (world == null) return;
         if (!world.getRegistryKey().equals(World.OVERWORLD)) return;
 
-        Optional<WeatherRegistry.WeatherEntry> entry = WeatherRegistry.forAbility(abilityId);
+        // Prefer the ability lookup: ability IDs carry the correct priority (e.g. Drizzle = 1,
+        // Primordial Sea = 2).  Fall back to the weather-ID lookup for move-triggered weather
+        // (e.g. wildboltstorm → THUNDERSTORM priority 2, rainweather → RAIN priority 0).
+        Optional<WeatherRegistry.WeatherEntry> entry = Optional.empty();
+        if (abilityId != null) {
+            entry = WeatherRegistry.forAbility(abilityId);
+        }
+        if (entry.isEmpty()) {
+            entry = WeatherRegistry.forWeather(weatherId);
+        }
         if (entry.isEmpty()) return;
 
         WeatherRegistry.WeatherEntry e = entry.get();
@@ -100,8 +115,8 @@ public final class CobblemonEventListener {
         long currentTick = world.getTime();
         ExampleMod.getWeatherManager().applyWeatherFromBattle(
                 world, battleId, e.type(), e.priority(), currentTick, ExampleMod.getConfig());
-        LOGGER.debug("[CobblemonWeather] Ability {} -> {} triggered (battle={})",
-                abilityId, e.type(), battleId);
+        LOGGER.debug("[CobblemonWeather] Weather instruction: ability={}, weather={} -> {} priority={} (battle={})",
+                abilityId, weatherId, e.type(), e.priority(), battleId);
     }
 
     public static void handleMoveUsed(PokemonBattle battle, String moveId) {
