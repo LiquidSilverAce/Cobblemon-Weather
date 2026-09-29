@@ -1,180 +1,100 @@
 package com.weather.logic;
 
 import com.weather.config.ServerConfig;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.world.World;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.Level;
 
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
 
+/** Server-thread-owned weather state. No state is shared between server sessions. */
 public final class BattleWeatherManager {
-    private static final Logger LOGGER = LoggerFactory.getLogger("cobblemon_weather");
+    private final Map<ResourceKey<Level>, ActiveBattleWeather> activeWeather = new HashMap<>();
+    private final Map<ResourceKey<Level>, Long> lastWeatherChangeTick = new HashMap<>();
+    private final Predicate<UUID> battleActive;
 
-    private final Map<RegistryKey<World>, ActiveBattleWeather> activeWeather = new ConcurrentHashMap<>();
-
-    /** Battles that are currently ongoing (started but not yet ended). */
-    private final Set<UUID> activeBattleIds = ConcurrentHashMap.newKeySet();
-
-    /** Tick at which the last thunderstorm was applied per dimension, for cooldown enforcement. */
-    private final Map<RegistryKey<World>, Long> lastThunderstormTick = new ConcurrentHashMap<>();
-
-    /** Minimum ticks between thunderstorm triggers (30 seconds), bypassed by Thundurus fast-track. */
-    private static final int THUNDERSTORM_COOLDOWN_TICKS = 600;
-
-    public void onBattleStart(UUID battleId) {
-        activeBattleIds.add(battleId);
-        LOGGER.debug("[CobblemonWeather] Battle started: {}", battleId);
+    public BattleWeatherManager(Predicate<UUID> battleActive) {
+        this.battleActive = battleActive;
     }
 
-    public void applyWeatherFromBattle(ServerWorld world,
-                                       UUID battleId,
-                                       BattleWeatherType type,
-                                       int priority,
-                                       long currentTick,
-                                       ServerConfig config) {
-        if (!config.isEnableWeatherIntegration()) return;
-
-        RegistryKey<World> dimKey = world.getRegistryKey();
-        ActiveBattleWeather existing = activeWeather.get(dimKey);
-
-        boolean shouldApply;
-        if (existing == null || existing.isExpired(currentTick)) {
-            shouldApply = true;
-        } else if (existing.getSourceBattleId().equals(battleId)) {
-            // Within the same battle, priority-2 weather (Primordial Sea / Desolate Land /
-            // Delta Stream) can only be replaced by another priority-2 effect.
-            // All other priority tiers (0 = moves, 1 = regular abilities) can override each other
-            // freely, matching base-game Cobblemon logic.
-            shouldApply = (existing.getPriority() < 2) || (priority >= 2);
-        } else if (!activeBattleIds.contains(existing.getSourceBattleId())) {
-            // The battle that originally set the weather has since ended: allow the new battle in
-            shouldApply = true;
-        } else {
-            // Different battle still active: first-setter gets priority
-            if (!config.isAllowCrossBattleOverride()) {
-                shouldApply = false;
-            } else {
-                // Primal moves (priority 2) always override if allowPrimalOverride is true
-                if (priority == 2 && config.isAllowPrimalOverride()) {
-                    shouldApply = true;
-                } else {
-                    shouldApply = priority > existing.getPriority();
-                }
-            }
-        }
-
-        if (shouldApply) {
-            int durationTicks = config.getBattleWeatherDurationTicks();
-            long expiresAt = currentTick + durationTicks;
-            ActiveBattleWeather record = new ActiveBattleWeather(type, battleId, priority, expiresAt);
-            activeWeather.put(dimKey, record);
-            applyMinecraftWeather(world, type, durationTicks);
-            LOGGER.debug("[CobblemonWeather] Applied {} in {} (battle={}, priority={}, expiresAt={})",
-                    type, dimKey.getValue(), battleId, priority, expiresAt);
-        }
+    public boolean applyWeatherFromBattle(ServerLevel world, UUID battleId, BattleWeatherType type,
+                                         int priority, long currentTick, ServerConfig config) {
+        if (!config.isEnableWeatherIntegration() || !world.dimension().equals(Level.OVERWORLD)) return false;
+        if (type == BattleWeatherType.THUNDERSTORM && !config.isEnableThunderstormIntegration()) return false;
+        Long last = lastWeatherChangeTick.get(world.dimension());
+        if (last != null && currentTick - last < config.getWeatherChangeCooldownTicks()) return false;
+        ActiveBattleWeather existing = activeWeather.get(world.dimension());
+        if (!canReplace(existing, battleId, priority, currentTick, config)) return false;
+        activeWeather.put(world.dimension(), new ActiveBattleWeather(type, battleId, priority,
+                currentTick + config.getBattleWeatherDurationTicks()));
+        applyMinecraftWeather(world, type, config.getBattleWeatherDurationTicks());
+        lastWeatherChangeTick.put(world.dimension(), currentTick);
+        return true;
     }
 
-    public void onBattleEnd(ServerWorld world, UUID battleId, long currentTick, ServerConfig config) {
-        if (!config.isEnableWeatherIntegration()) return;
+    private boolean canReplace(ActiveBattleWeather existing, UUID battleId, int priority,
+                               long currentTick, ServerConfig config) {
+        if (existing == null || existing.isExpired(currentTick)) return true;
+        if (!battleActive.test(existing.getSourceBattleId())) return true;
+        if (existing.getSourceBattleId().equals(battleId)) {
+            return existing.getPriority() < 2 || priority >= 2;
+        }
+        return config.isAllowCrossBattleOverride()
+                && (priority > existing.getPriority() || (priority == 2 && config.isAllowPrimalOverride()));
+    }
 
-        activeBattleIds.remove(battleId);
+    /** Only Wildbolt Storm can start thunder without rain; all storms share the normal arbitration. */
+    public boolean applyThunderstorm(ServerLevel world, UUID battleId, String moveId,
+                                     long currentTick, ServerConfig config) {
+        boolean wildbolt = "wildboltstorm".equals(moveId);
+        if (!wildbolt && !"thunder".equals(moveId) && !"thunderbolt".equals(moveId)) return false;
+        if (!config.isEnableWeatherIntegration() || !config.isEnableThunderstormIntegration()) return false;
+        // Check authoritative weather, not the rain animation's fading intensity. This permits
+        // immediate rain -> thunder changes and prevents clear -> thunder during a rain fade-out.
+        if (!wildbolt && !world.getLevelData().isRaining()) return false;
+        return applyWeatherFromBattle(world, battleId, BattleWeatherType.THUNDERSTORM,
+                wildbolt ? 2 : 0, currentTick, config);
+    }
 
-        RegistryKey<World> dimKey = world.getRegistryKey();
-        ActiveBattleWeather existing = activeWeather.get(dimKey);
+    /** Battle weather ending releases primal protection without cutting short the world weather duration. */
+    public void releasePriority(ServerLevel world, UUID battleId) {
+        ActiveBattleWeather existing = activeWeather.get(world.dimension());
         if (existing != null && existing.getSourceBattleId().equals(battleId)) {
-            if (config.isClearWeatherOnBattleEnd()) {
-                activeWeather.remove(dimKey);
+            activeWeather.put(world.dimension(), new ActiveBattleWeather(existing.getType(), battleId,
+                    0, existing.getExpiresAtTick()));
+        }
+    }
+
+    public void tick(ServerLevel world, long currentTick, ServerConfig config) {
+        ActiveBattleWeather existing = activeWeather.get(world.dimension());
+        if (existing == null) return;
+        if (existing.isExpired(currentTick)) {
+            activeWeather.remove(world.dimension());
+        } else if (!battleActive.test(existing.getSourceBattleId())) {
+            // Includes fleeing, capture, disconnect, draws and forced stops, not just victories.
+            activeWeather.remove(world.dimension());
+            if (config.isEnableWeatherIntegration() && config.isClearWeatherOnBattleEnd()) {
                 applyMinecraftWeather(world, BattleWeatherType.CLEAR, config.getBattleWeatherDurationTicks());
-                LOGGER.debug("[CobblemonWeather] Cleared weather in {} after battle {} ended",
-                        dimKey.getValue(), battleId);
-            }
-            // Otherwise let expiresAtTick decay naturally
-        }
-    }
-
-    public void tick(ServerWorld world, long currentTick, ServerConfig config) {
-        if (!config.isEnableWeatherIntegration()) return;
-
-        RegistryKey<World> dimKey = world.getRegistryKey();
-        ActiveBattleWeather existing = activeWeather.get(dimKey);
-        if (existing != null && existing.isExpired(currentTick)) {
-            activeWeather.remove(dimKey);
-            LOGGER.debug("[CobblemonWeather] Battle weather expired in {}", dimKey.getValue());
-        }
-    }
-
-    /**
-     * Attempts to apply a THUNDERSTORM to the given world.
-     *
-     * <p>For thunder/thunderbolt this requires the world to already be raining.
-     * For Thundurus Wildbolt Storm (fastTrack=true) it always applies and bypasses the
-     * cooldown so the storm starts faster.
-     *
-     * @param world     the ServerWorld to affect
-     * @param fastTrack {@code true} for the Thundurus Wildbolt Storm special case
-     * @param currentTick current world time in ticks
-     * @param config    server config
-     */
-    public void applyThunderstorm(ServerWorld world, boolean fastTrack, long currentTick, ServerConfig config) {
-        if (!config.isEnableThunderstormIntegration()) return;
-
-        RegistryKey<World> dimKey = world.getRegistryKey();
-
-        if (!fastTrack) {
-            // Normal thunder/thunderbolt: requires rain and respects cooldown
-            if (!world.isRaining()) return;
-
-            Long last = lastThunderstormTick.get(dimKey);
-            if (last != null && (currentTick - last) < THUNDERSTORM_COOLDOWN_TICKS) {
-                LOGGER.debug("[CobblemonWeather] Thunderstorm blocked by cooldown in {} ({} ticks remaining)",
-                        dimKey.getValue(), THUNDERSTORM_COOLDOWN_TICKS - (currentTick - last));
-                return;
+                lastWeatherChangeTick.put(world.dimension(), currentTick);
             }
         }
-
-        int durationTicks = config.getBattleWeatherDurationTicks();
-        lastThunderstormTick.put(dimKey, currentTick);
-        world.setWeather(0, durationTicks, true, true);
-        LOGGER.debug("[CobblemonWeather] Applied THUNDERSTORM in {} (fastTrack={}, duration={}t)",
-                dimKey.getValue(), fastTrack, durationTicks);
     }
 
-    /** One full Minecraft day = 24000 ticks (20 ticks/sec x 1200 sec). */
-    private static final int DEFAULT_WEATHER_DURATION_TICKS = 24000;
+    public void applyDebugWeather(ServerLevel world, BattleWeatherType type, ServerConfig config) {
+        activeWeather.remove(world.dimension());
+        lastWeatherChangeTick.put(world.dimension(), world.getGameTime());
+        applyMinecraftWeather(world, type, config.getBattleWeatherDurationTicks());
+    }
 
-    /**
-     * Apply weather directly by type (used by debug command and battle logic).
-     *
-     * @param durationTicks how long the vanilla weather effect should last
-     */
-    public static void applyMinecraftWeather(ServerWorld world, BattleWeatherType type, int durationTicks) {
+    public static void applyMinecraftWeather(ServerLevel world, BattleWeatherType type, int durationTicks) {
         switch (type) {
-            // Both CLEAR and SUN set clear weather (no rain, no thunder).
-            // SUN additionally signals "harsh sunlight" to battle-side logic, but the
-            // vanilla weather call is identical.  Delta Stream (CLEAR) and Sunny Day (SUN)
-            // therefore both stop any ongoing rain, thunderstorm, or snowstorm.
-            case CLEAR, SUN -> world.setWeather(durationTicks, 0, false, false);
-            case RAIN -> world.setWeather(0, durationTicks, true, false);
-            // THUNDERSTORM: raining + thundering
-            case THUNDERSTORM -> world.setWeather(0, durationTicks, true, true);
-            // SAND and SNOW also set vanilla raining=true.  Particle Rain reads isRaining() and
-            // then selects the correct visual effect per biome: sandstorm particles in hot/dry
-            // biomes (Precipitation.NONE + high temp) and snowstorm particles in cold biomes
-            // (Precipitation.SNOW).  No additional server-side call is needed.
-            case SAND, SNOW -> world.setWeather(0, durationTicks, true, false);
+            case CLEAR, SUN -> world.setWeatherParameters(durationTicks, 0, false, false);
+            case THUNDERSTORM -> world.setWeatherParameters(0, durationTicks, true, true);
+            // Precipitation visuals remain biome-dependent; this does not force snow/sand in every biome.
+            case RAIN, SAND, SNOW -> world.setWeatherParameters(0, durationTicks, true, false);
         }
-    }
-
-    /**
-     * Apply weather directly by type using the default duration.
-     * Convenience overload used by the debug command.
-     */
-    public static void applyMinecraftWeather(ServerWorld world, BattleWeatherType type) {
-        applyMinecraftWeather(world, type, DEFAULT_WEATHER_DURATION_TICKS);
     }
 }

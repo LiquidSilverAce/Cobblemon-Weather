@@ -2,3 +2,8 @@
 build/
 out/
 *.class
+.kotlin/
+.architectury-transformer/
+run/
+.idea/
+*.iml

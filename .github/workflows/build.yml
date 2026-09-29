@@ -1,0 +1,33 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        cobblemon: ['1.7.3+1.21.1', '1.8.1+1.21.1']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew build :fabric:runGametest -Pcobblemon_version=${{ matrix.cobblemon }} --no-daemon --max-workers=2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.cobblemon }}
+          path: |
+            common/build/reports/tests/
+            fabric/build/gametest-results.xml
+            fabric/build/libs/
+            neoforge/build/libs/

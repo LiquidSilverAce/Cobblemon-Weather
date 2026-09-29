@@ -14,7 +14,7 @@ import java.util.Optional;
  * <ul>
  *   <li>0 — regular weather moves (Rain Dance, Sunny Day, Sandstorm, Snowscape)</li>
  *   <li>1 — standard weather abilities (Drizzle, Drought, Sand Stream, Snow Warning, Orichalcum Pulse)</li>
- *   <li>2 — priority weather (Primordial Sea, Desolate Land, Delta Stream, Wildbolt Storm):
+ *   <li>2 — priority weather (Primordial Sea, Desolate Land, Delta Stream):
  *       can only be replaced by another priority-2 effect</li>
  * </ul>
  *
@@ -43,6 +43,7 @@ public final class WeatherRegistry {
         MOVE_REGISTRY.put("sunnyday",   new WeatherEntry(BattleWeatherType.SUN,  0));
         MOVE_REGISTRY.put("raindance",  new WeatherEntry(BattleWeatherType.RAIN, 0));
         MOVE_REGISTRY.put("sandstorm",  new WeatherEntry(BattleWeatherType.SAND, 0));
+        MOVE_REGISTRY.put("hail", new WeatherEntry(BattleWeatherType.SNOW, 0));
         MOVE_REGISTRY.put("snowscape",  new WeatherEntry(BattleWeatherType.SNOW, 0));
 
         // Abilities — priority 1 (normal), priority 2 (primal/special)
@@ -54,19 +55,20 @@ public final class WeatherRegistry {
         ABILITY_REGISTRY.put("primordialsea",   new WeatherEntry(BattleWeatherType.RAIN,  2));
         ABILITY_REGISTRY.put("desolateland",    new WeatherEntry(BattleWeatherType.SUN,   2));
         // Delta Stream clears all overworld weather when the Pokemon switches in.
-        // Priority 2 so only Desolate Land or Primordial Sea can override it.
+        // Priority 2 so only another priority-2 effect can override it.
         ABILITY_REGISTRY.put("deltastream",     new WeatherEntry(BattleWeatherType.CLEAR, 2));
 
         // Weather IDs (Showdown |-weather| message argument 0, lowercased).
         // Used by WeatherInstructionMixin for move-triggered or unnamed-source weather.
+        // Showdown uses RainDance/SunnyDay; retain old aliases for addon protocols.
+        WEATHER_REGISTRY.put("raindance", new WeatherEntry(BattleWeatherType.RAIN, 0));
+        WEATHER_REGISTRY.put("sunnyday", new WeatherEntry(BattleWeatherType.SUN, 0));
+        WEATHER_REGISTRY.put("hail", new WeatherEntry(BattleWeatherType.SNOW, 0));
         // Move-triggered weather (priority 0)
         WEATHER_REGISTRY.put("rainweather",   new WeatherEntry(BattleWeatherType.RAIN,        0));
         WEATHER_REGISTRY.put("sunnyweather",  new WeatherEntry(BattleWeatherType.SUN,         0));
         WEATHER_REGISTRY.put("sandstorm",     new WeatherEntry(BattleWeatherType.SAND,        0));
         WEATHER_REGISTRY.put("snow",          new WeatherEntry(BattleWeatherType.SNOW,        0));
-        // Wildbolt Storm (Thundurus signature move) — priority 2 thunderstorm.
-        // Once applied, only another priority-2 effect can change the overworld weather.
-        WEATHER_REGISTRY.put("wildboltstorm", new WeatherEntry(BattleWeatherType.THUNDERSTORM, 2));
         // Primal/special weather IDs (priority 2) — also covered via ABILITY_REGISTRY when
         // the [from] ability: tag is present, but included here as a fallback.
         WEATHER_REGISTRY.put("primordialsea", new WeatherEntry(BattleWeatherType.RAIN,        2));
@@ -89,7 +91,7 @@ public final class WeatherRegistry {
      * {@code effectAt(0)} in a {@code |-weather|} message after normalisation).
      *
      * @param weatherId the raw or already-normalised weather ID (e.g. {@code "rainweather"},
-     *                  {@code "wildboltstorm"}, {@code "deltastream"})
+     *                  {@code "sunnyday"}, {@code "deltastream"})
      * @return the matching {@link WeatherEntry}, or empty if the weather ID is unknown
      */
     public static Optional<WeatherEntry> forWeather(String weatherId) {
@@ -101,8 +103,8 @@ public final class WeatherRegistry {
      * Lower-cases and strips any resource-location namespace prefix
      * (e.g. {@code "cobblemon:drizzle"} → {@code "drizzle"}).
      */
-    private static String normalizeId(String id) {
-        String lower = id.toLowerCase();
+    public static String normalizeId(String id) {
+        String lower = id.toLowerCase(java.util.Locale.ROOT);
         // Minecraft resource locations have exactly one colon ("namespace:path").
         int colon = lower.indexOf(':');
         return colon >= 0 ? lower.substring(colon + 1) : lower;

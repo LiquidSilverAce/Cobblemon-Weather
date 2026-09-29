@@ -3,16 +3,14 @@
   "id": "cobblemon_weather",
   "version": "${version}",
   "name": "Cobblemon Weather",
-  "description": "This is an example description! Tell everyone what your mod is about!",
+  "description": "Overworld weather driven by Cobblemon battle moves and abilities, with a configurable player whitelist.",
   "authors": [
-    "Me!"
+    "LiquidSilverAce"
   ],
   "contact": {
-    "homepage": "https://fabricmc.net/",
-    "sources": "https://github.com/FabricMC/fabric-example-mod"
+    "sources": "https://github.com/LiquidSilverAce/Cobblemon-Weather"
   },
-  "license": "CC0-1.0",
-  "icon": "assets/cobblemon_weather/icon.png",
+  "license": "MIT",
   "environment": "*",
   "entrypoints": {
     "main": [
@@ -27,13 +25,19 @@
   ],
   "depends": {
     "fabricloader": ">=0.18.4",
-    "minecraft": "~1.21.1",
+    "minecraft": "1.21.1",
     "java": ">=21",
     "architectury": ">=13.0.8",
     "fabric-api": "*"
   },
   "suggests": {
-    "cobblemon": ">=1.6.1",
+    "cobblemon": ">=1.7.3 <1.9",
     "particlerain": "*"
+  },
+  "breaks": {
+    "cobblemon": [
+      "<1.7.3",
+      ">=1.9"
+    ]
   }
 }

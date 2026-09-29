@@ -1,30 +1,29 @@
 modLoader = "javafml"
 loaderVersion = "[4,)"
 #issueTrackerURL = ""
-license = "Insert License Here"
+license = "MIT"
 
 [[mods]]
 modId = "cobblemon_weather"
 version = "${version}"
 displayName = "Cobblemon Weather"
-authors = "Me!"
-description = "'''
-This is an example description! Tell everyone what your mod is about!
+authors = "LiquidSilverAce"
+description = '''
+Overworld weather driven by Cobblemon battle moves and abilities, with a configurable player whitelist.
 '''
-"
 #logoFile = ""
 
 [[dependencies.cobblemon_weather]]
 modId = "neoforge"
 type = "required"
-versionRange = "[21.1,)"
+versionRange = "[21.1.215,)"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.cobblemon_weather]]
 modId = "minecraft"
 type = "required"
-versionRange = "[1.21.1,)"
+versionRange = "[1.21.1]"
 ordering = "NONE"
 side = "BOTH"
 
@@ -38,7 +37,7 @@ side = "BOTH"
 [[dependencies.cobblemon_weather]]
 modId = "cobblemon"
 type = "optional"
-versionRange = "[1.6.1,)"
+versionRange = "[1.7.3,1.9)"
 ordering = "AFTER"
 side = "BOTH"
 

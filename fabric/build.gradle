@@ -33,7 +33,9 @@ dependencies {
     // Architectury API. This is optional, and you can comment it out if you don't need it.
     modImplementation "dev.architectury:architectury-fabric:$rootProject.architectury_api_version"
 
-    modCompileOnly "com.cobblemon:fabric:$rootProject.cobblemon_version"
+    modImplementation "com.cobblemon:fabric:$rootProject.cobblemon_version"
+
+    modLocalRuntime 'net.fabricmc:fabric-language-kotlin:1.13.6+kotlin.2.2.20'
 
     common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
     shadowBundle project(path: ':common', configuration: 'transformProductionFabric')
@@ -55,3 +57,36 @@ shadowJar {
 remapJar {
     inputFile.set shadowJar.archiveFile
 }
+
+sourcesJar { from project(':common').sourceSets.main.allSource }
+
+sourceSets {
+    gametest {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+
+loom {
+    mods {
+        cobblemon_weather {
+            sourceSet sourceSets.main
+            sourceSet project(':common').sourceSets.main
+        }
+        cobblemon_weather_tests {
+            sourceSet sourceSets.gametest
+        }
+    }
+    runs {
+        gametest {
+            server()
+            name 'Cobblemon Weather Game Tests'
+            source sourceSets.gametest
+            vmArg '-Dfabric-api.gametest'
+            vmArg "-Dfabric-api.gametest.report-file=${layout.buildDirectory.file('gametest-results.xml').get().asFile}"
+            runDir 'build/gametest'
+        }
+    }
+}
+
+tasks.named('runGametest') { timeout = java.time.Duration.ofMinutes(5) }

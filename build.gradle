@@ -1,7 +1,8 @@
 plugins {
-    id 'dev.architectury.loom' version '1.13.467' apply false
-    id 'architectury-plugin' version '3.4-SNAPSHOT'
+    id 'dev.architectury.loom' version '1.11.458' apply false
+    id 'architectury-plugin' version '3.4.164'
     id 'com.gradleup.shadow' version '8.3.6' apply false
+    id 'org.jetbrains.kotlin.jvm' version '2.2.20' apply false
 }
 
 architectury {
@@ -17,6 +18,8 @@ subprojects {
     apply plugin: 'dev.architectury.loom'
     apply plugin: 'architectury-plugin'
     apply plugin: 'maven-publish'
+    // Remap Cobblemon's Kotlin reflection metadata along with its bytecode.
+    apply plugin: 'org.jetbrains.kotlin.jvm'
 
     base {
         // Set up a suffixed format for the mod jar names, e.g. `example-fabric`.
@@ -24,6 +27,7 @@ subprojects {
     }
 
     repositories {
+        mavenCentral()
         // Add repositories to retrieve artifacts from in here.
         // You should only use this when depending on other mods because
         // Loom adds the essential maven repositories to download Minecraft and libraries from automatically.
@@ -31,16 +35,18 @@ subprojects {
         // for more information about repositories.
         maven {
             name = "Cobblemon"
-            url = "https://artefacts.cobblemon.com/releases/"
+            url = "https://maven.impactdev.net/repository/development/"
+            content { includeGroup "com.cobblemon" }
         }
     }
 
+    loom { silentMojangMappingsLicense() }
+
     dependencies {
         minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
-        mappings loom.layered {
-            it.mappings("net.fabricmc:yarn:$rootProject.yarn_mappings:v2")
-            it.mappings("dev.architectury:yarn-mappings-patch-neoforge:$rootProject.yarn_mappings_patch_neoforge_version")
-        }
+        mappings loom.officialMojangMappings()
+        // Needed by Cobblemon 1.8.1's battle engine in dedicated development servers.
+        minecraftServerLibraries 'com.ibm.icu:icu4j:71.1'
     }
 
     java {
