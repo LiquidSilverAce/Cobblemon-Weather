@@ -8,6 +8,13 @@ import com.cobblemon.mod.common.battles.BattleSide;
 import com.cobblemon.mod.common.battles.ShowdownInterpreter;
 import com.cobblemon.mod.common.battles.actor.PlayerBattleActor;
 import com.cobblemon.mod.common.battles.dispatch.InstructionSet;
+import com.cobblemon.mod.common.battles.dispatch.InterpreterInstruction;
+import com.cobblemon.mod.common.battles.interpreter.instructions.ActivateInstruction;
+import com.cobblemon.mod.common.battles.interpreter.instructions.DamageInstruction;
+import com.cobblemon.mod.common.battles.interpreter.instructions.EndInstruction;
+import com.cobblemon.mod.common.battles.interpreter.instructions.FailInstruction;
+import com.cobblemon.mod.common.battles.interpreter.instructions.ImmuneInstruction;
+import com.cobblemon.mod.common.battles.interpreter.instructions.MissInstruction;
 import com.cobblemon.mod.common.battles.interpreter.instructions.MoveInstruction;
 import com.cobblemon.mod.common.battles.interpreter.instructions.WeatherInstruction;
 import com.cobblemon.mod.common.battles.pokemon.BattlePokemon;
@@ -90,11 +97,11 @@ public final class WeatherGameTests implements FabricGameTest {
 
     private void testInstructions(GameTestHelper h, ServerLevel world) throws Exception {
         ServerPlayer player = h.makeMockServerPlayerInLevel();
-        BattlePokemon allowed = pokemon(), denied = pokemon();
+        BattlePokemon allowed = pokemon(), denied = pokemon(), otherTarget = pokemon();
         PlayerBattleActor a = new PlayerBattleActor(player.getUUID(), List.of(allowed));
-        PlayerBattleActor b = new PlayerBattleActor(UUID.randomUUID(), List.of(denied));
+        PlayerBattleActor b = new PlayerBattleActor(UUID.randomUUID(), List.of(denied, otherTarget));
         a.setShowdownId("p1"); b.setShowdownId("p2");
-        PokemonBattle battle = new PokemonBattle(new BattleFormat(), new BattleSide(a), new BattleSide(b));
+        PokemonBattle battle = new PokemonBattle(BattleFormat.Companion.getGEN_9_DOUBLES(), new BattleSide(a), new BattleSide(b));
         String allowId = "p1a: " + allowed.getUuid(), denyId = "p2a: " + denied.getUuid();
         configure("{\"weatherWhitelist\":[\"" + player.getUUID() + "\"],\"weatherChangeCooldownTicks\":0,\"battleWeatherDurationTicks\":800}");
         clear(world);
@@ -115,12 +122,16 @@ public final class WeatherGameTests implements FabricGameTest {
         weather(battle, "|-weather|RainDance");
         assertWeather(h, world, true, false, 800);
         clear(world);
-        move(battle, "|move|" + denyId + "|Wildbolt Storm");
+        move(battle, "|move|" + denyId + "|Wildbolt Storm|" + allowId,
+                "|-damage|" + allowId + "|50/100");
         h.assertTrue(!world.getLevelData().isRaining(), "Unlisted Wildbolt Storm user must be blocked");
-        move(battle, "|move|" + allowId + "|Thunder");
-        move(battle, "|move|" + allowId + "|Thunderbolt");
+        move(battle, "|move|" + allowId + "|Thunder|" + denyId, "|-damage|" + denyId + "|50/100");
+        move(battle, "|move|" + allowId + "|Thunderbolt|" + denyId, "|-damage|" + denyId + "|50/100");
         h.assertTrue(!world.getLevelData().isRaining(), "Neither Thunder nor Thunderbolt can start rain");
-        move(battle, "|move|" + allowId + "|Wildbolt Storm");
+        testMoveResults(h, world, battle, allowId, denyId, "p2b: " + otherTarget.getUuid());
+        clear(world);
+        move(battle, "|move|" + allowId + "|Wildbolt Storm|" + denyId,
+                "|-damage|" + denyId + "|50/100");
         assertWeather(h, world, true, true, 800);
         clear(world);
         configure("{\"weatherWhitelist\":[],\"weatherChangeCooldownTicks\":0}");
@@ -141,6 +152,64 @@ public final class WeatherGameTests implements FabricGameTest {
         ShowdownInterpreter.INSTANCE.getLastCauser().remove(battle.getBattleId());
     }
 
+    private static void testMoveResults(GameTestHelper h, ServerLevel world, PokemonBattle battle,
+                                        String source, String target, String otherTarget) {
+        for (String name : List.of("Rain Dance", "Sunny Day", "Sandstorm", "Hail", "Snowscape")) {
+            clear(world);
+            move(battle, "|move|" + source + "|" + name + "|" + source, "|-fail|" + source);
+            h.assertTrue(!world.getLevelData().isRaining(), name + " failure must leave weather unchanged");
+        }
+        for (String name : List.of("Thunder", "Thunderbolt", "Wildbolt Storm")) {
+            String attempted = "|move|" + source + "|" + name + "|" + target;
+            for (String result : List.of("|-miss|" + source + "|" + target,
+                    "|-fail|" + source, "|-immune|" + target,
+                    "|-activate|" + target + "|move: Protect",
+                    "|-activate|" + target + "|ability: Volt Absorb",
+                    "|-damage|" + target + "|50/100|[from] psn",
+                    "|-damage|" + source + "|50/100|[from] recoil")) {
+                prepareMoveWeather(world, name);
+                move(battle, attempted, result);
+                h.assertTrue(!world.getLevelData().isThundering(), name + " must not set thunder after " + result);
+                h.assertTrue(world.getLevelData().isRaining() == !name.equals("Wildbolt Storm"),
+                        "Failed moves must preserve existing weather");
+                h.assertTrue(world.getServer().getWorldData().overworldData().getRainTime() == 321,
+                        "Failed moves must not refresh the weather duration");
+            }
+            prepareMoveWeather(world, name);
+            move(battle, attempted);
+            h.assertTrue(!world.getLevelData().isThundering(), "A move announcement alone is insufficient");
+            move(battle, attempted, "|-miss|" + source + "|" + target,
+                    "|move|" + target + "|Tackle|" + source, "|-damage|" + source + "|50/100");
+            h.assertTrue(!world.getLevelData().isThundering(), "The next move's hit cannot validate a missed move");
+            for (String hit : List.of("|-damage|" + target + "|50/100",
+                    "|-activate|" + target + "|Substitute|[damage]",
+                    "|-end|" + target + "|Substitute")) {
+                prepareMoveWeather(world, name);
+                move(battle, attempted, hit);
+                assertWeather(h, world, true, true, 800);
+            }
+        }
+        prepareMoveWeather(world, "Wildbolt Storm");
+        String spreadMove = "|move|" + source + "|Wildbolt Storm|" + target + "|[spread] p2a,p2b";
+        move(battle, spreadMove, "|-miss|" + source + "|" + target,
+                "|-miss|" + source + "|" + otherTarget);
+        h.assertTrue(!world.getLevelData().isRaining(), "Wildbolt Storm missing every target cannot start rain");
+        move(battle, spreadMove, "|-miss|" + source + "|" + target,
+                "|-damage|" + otherTarget + "|50/100");
+        assertWeather(h, world, true, true, 800);
+        for (String defense : List.of("move: Protect", "ability: Volt Absorb")) {
+            prepareMoveWeather(world, "Wildbolt Storm");
+            move(battle, spreadMove, "|-activate|" + target + "|" + defense,
+                    "|-damage|" + otherTarget + "|50/100");
+            assertWeather(h, world, true, true, 800);
+        }
+    }
+
+    private static void prepareMoveWeather(ServerLevel world, String move) {
+        clear(world);
+        world.setWeatherParameters(321, 321, !move.equals("Wildbolt Storm"), false);
+    }
+
     private static BattlePokemon pokemon() {
         PokemonProperties properties = new PokemonProperties();
         properties.setSpecies("pikachu");
@@ -152,10 +221,24 @@ public final class WeatherGameTests implements FabricGameTest {
         drain(battle);
     }
 
-    private static void move(PokemonBattle battle, String line) {
+    private static void move(PokemonBattle battle, String line, String... results) {
         InstructionSet set = new InstructionSet();
         MoveInstruction instruction = new MoveInstruction(set, new BattleMessage(line));
         set.getInstructions().add(instruction);
+        for (String result : results) {
+            BattleMessage message = new BattleMessage(result);
+            InterpreterInstruction outcome = switch (message.getId()) {
+                case "-damage" -> new DamageInstruction(set, message.battlePokemon(0, battle).getActor(), message, message);
+                case "-miss" -> new MissInstruction(battle, message);
+                case "-fail" -> new FailInstruction(message);
+                case "-immune" -> new ImmuneInstruction(message);
+                case "-activate" -> new ActivateInstruction(set, message);
+                case "-end" -> new EndInstruction(message);
+                case "move" -> new MoveInstruction(set, message);
+                default -> throw new IllegalArgumentException("Unsupported test result: " + result);
+            };
+            set.getInstructions().add(outcome);
+        }
         instruction.invoke(battle);
         drain(battle);
     }

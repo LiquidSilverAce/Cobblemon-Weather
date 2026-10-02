@@ -5,6 +5,7 @@ import com.cobblemon.mod.common.api.battles.model.PokemonBattle;
 import com.cobblemon.mod.common.battles.interpreter.instructions.MoveInstruction;
 import com.cobblemon.mod.common.battles.pokemon.BattlePokemon;
 import com.weather.cobblemon.CobblemonEventListener;
+import com.weather.cobblemon.MoveOutcome;
 import kotlin.Unit;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -25,7 +26,11 @@ public abstract class MoveInstructionMixin {
         BattlePokemon source = userPokemon;
         String moveId = effect.getId();
         battle.dispatchGo(() -> {
-            CobblemonEventListener.handleMoveUsed(battle, source, moveId);
+            // A |move| announces an attempt. Its result instructions are populated before
+            // the dispatch queue runs, so require a hit before applying addon weather.
+            if (MoveOutcome.hasHit((MoveInstruction) (Object) this)) {
+                CobblemonEventListener.handleMoveUsed(battle, source, moveId);
+            }
             return Unit.INSTANCE;
         });
     }

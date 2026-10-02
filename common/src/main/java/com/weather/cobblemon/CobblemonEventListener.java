@@ -66,7 +66,8 @@ public final class CobblemonEventListener {
         ServerLevel world = getBattleWorld(battle, source);
         if (world == null) return;
         // Regular weather moves are handled only by actual |-weather| messages. A failed move
-        // must not change the world. These three electrical moves are this addon's explicit effects.
+        // must not change the world. The move mixin confirms a successful electrical hit
+        // before invoking this addon's explicit thunderstorm effects.
         ExampleMod.getWeatherManager().applyThunderstorm(world, battle.getBattleId(),
                 WeatherRegistry.normalizeId(moveId), world.getGameTime(), ExampleMod.getConfig());
     }
